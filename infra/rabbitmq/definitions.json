@@ -1,0 +1,276 @@
+{
+  "rabbit_version": "3.13.0",
+  "users": [
+    {
+      "name": "guest",
+      "password_hash": "kI3GCqW5JLMJa4iX1lo7X4D6XbYqlLgxIs30+P6tENUV2POR",
+      "hashing_algorithm": "rabbit_password_hashing_sha256",
+      "tags": ["administrator"]
+    }
+  ],
+  "permissions": [
+    {
+      "user": "guest",
+      "vhost": "/",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    }
+  ],
+  "vhosts": [
+    {
+      "name": "/"
+    }
+  ],
+  "exchanges": [
+    {
+      "name": "ecommerce.events",
+      "vhost": "/",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false
+    },
+    {
+      "name": "ecommerce.dlx",
+      "vhost": "/",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false
+    }
+  ],
+  "queues": [
+    {
+      "name": "order.created",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "ecommerce.dlx",
+        "x-dead-letter-routing-key": "order.created.dlq"
+      }
+    },
+    {
+      "name": "payment.requested",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "ecommerce.dlx",
+        "x-dead-letter-routing-key": "payment.requested.dlq"
+      }
+    },
+    {
+      "name": "payment.completed",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "ecommerce.dlx",
+        "x-dead-letter-routing-key": "payment.completed.dlq"
+      }
+    },
+    {
+      "name": "stock.reserve",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "ecommerce.dlx",
+        "x-dead-letter-routing-key": "stock.reserve.dlq"
+      }
+    },
+    {
+      "name": "stock.reserved",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "ecommerce.dlx",
+        "x-dead-letter-routing-key": "stock.reserved.dlq"
+      }
+    },
+    {
+      "name": "order.completed",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "ecommerce.dlx",
+        "x-dead-letter-routing-key": "order.completed.dlq"
+      }
+    },
+    {
+      "name": "order.failed",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "ecommerce.dlx",
+        "x-dead-letter-routing-key": "order.failed.dlq"
+      }
+    },
+    {
+      "name": "order.created.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "payment.requested.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "payment.completed.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "stock.reserve.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "stock.reserved.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "order.completed.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "order.failed.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    }
+  ],
+  "bindings": [
+    {
+      "source": "ecommerce.events",
+      "vhost": "/",
+      "destination": "order.created",
+      "destination_type": "queue",
+      "routing_key": "order.created"
+    },
+    {
+      "source": "ecommerce.events",
+      "vhost": "/",
+      "destination": "payment.requested",
+      "destination_type": "queue",
+      "routing_key": "payment.requested"
+    },
+    {
+      "source": "ecommerce.events",
+      "vhost": "/",
+      "destination": "payment.completed",
+      "destination_type": "queue",
+      "routing_key": "payment.succeeded"
+    },
+    {
+      "source": "ecommerce.events",
+      "vhost": "/",
+      "destination": "payment.completed",
+      "destination_type": "queue",
+      "routing_key": "payment.failed"
+    },
+    {
+      "source": "ecommerce.events",
+      "vhost": "/",
+      "destination": "stock.reserve",
+      "destination_type": "queue",
+      "routing_key": "stock.reserve"
+    },
+    {
+      "source": "ecommerce.events",
+      "vhost": "/",
+      "destination": "stock.reserved",
+      "destination_type": "queue",
+      "routing_key": "stock.reserved"
+    },
+    {
+      "source": "ecommerce.events",
+      "vhost": "/",
+      "destination": "stock.reserved",
+      "destination_type": "queue",
+      "routing_key": "stock.failed"
+    },
+    {
+      "source": "ecommerce.events",
+      "vhost": "/",
+      "destination": "order.completed",
+      "destination_type": "queue",
+      "routing_key": "order.completed"
+    },
+    {
+      "source": "ecommerce.events",
+      "vhost": "/",
+      "destination": "order.failed",
+      "destination_type": "queue",
+      "routing_key": "order.failed"
+    },
+    {
+      "source": "ecommerce.dlx",
+      "vhost": "/",
+      "destination": "order.created.dlq",
+      "destination_type": "queue",
+      "routing_key": "order.created.dlq"
+    },
+    {
+      "source": "ecommerce.dlx",
+      "vhost": "/",
+      "destination": "payment.requested.dlq",
+      "destination_type": "queue",
+      "routing_key": "payment.requested.dlq"
+    },
+    {
+      "source": "ecommerce.dlx",
+      "vhost": "/",
+      "destination": "payment.completed.dlq",
+      "destination_type": "queue",
+      "routing_key": "payment.completed.dlq"
+    },
+    {
+      "source": "ecommerce.dlx",
+      "vhost": "/",
+      "destination": "stock.reserve.dlq",
+      "destination_type": "queue",
+      "routing_key": "stock.reserve.dlq"
+    },
+    {
+      "source": "ecommerce.dlx",
+      "vhost": "/",
+      "destination": "stock.reserved.dlq",
+      "destination_type": "queue",
+      "routing_key": "stock.reserved.dlq"
+    },
+    {
+      "source": "ecommerce.dlx",
+      "vhost": "/",
+      "destination": "order.completed.dlq",
+      "destination_type": "queue",
+      "routing_key": "order.completed.dlq"
+    },
+    {
+      "source": "ecommerce.dlx",
+      "vhost": "/",
+      "destination": "order.failed.dlq",
+      "destination_type": "queue",
+      "routing_key": "order.failed.dlq"
+    }
+  ]
+}

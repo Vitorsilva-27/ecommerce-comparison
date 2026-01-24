@@ -1,0 +1,302 @@
+version: "3.8"
+
+services:
+  # ===================
+  # Infrastructure
+  # ===================
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ecommerce}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ecommerce_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-ecommerce}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ecommerce}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+      - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
+      - ./rabbitmq/definitions.json:/etc/rabbitmq/definitions.json
+    ports:
+      - "5673:5672"
+      - "15692:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    networks:
+      - backend
+
+  # ===================
+  # Observability
+  # ===================
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-lifecycle"
+    ports:
+      - "9090:9090"
+    networks:
+      - backend
+
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GF_SECURITY_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - backend
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.52
+    container_name: jaeger
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686" # UI
+      - "4317:4317" # OTLP gRPC
+      - "4318:4318" # OTLP HTTP
+      - "6831:6831/udp" # Thrift compact
+    networks:
+      - backend
+
+  # ===================
+  # Application Services
+  # ===================
+  api-gateway:
+    build:
+      context: ../services
+      dockerfile: api-gateway/Dockerfile
+    container_name: api-gateway
+    environment:
+      - CATALOG_SERVICE_URL=${CATALOG_SERVICE_URL:-http://catalog-service:8001}
+      - CART_SERVICE_URL=${CART_SERVICE_URL:-http://cart-service:8002}
+      - ORDER_SERVICE_URL=${ORDER_SERVICE_URL:-http://order-service:8003}
+      - PAYMENT_SERVICE_URL=${PAYMENT_SERVICE_URL:-http://payment-service:8004}
+      - INVENTORY_SERVICE_URL=${INVENTORY_SERVICE_URL:-http://inventory-service:8005}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-http://jaeger:4317}
+      - COMMUNICATION_MODE=${COMMUNICATION_MODE:-sync}
+    ports:
+      - "8181:8181"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - frontend
+      - backend
+
+  catalog-service:
+    build:
+      context: ../services
+      dockerfile: catalog-service/Dockerfile
+    container_name: catalog-service
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql://ecommerce:ecommerce_pass@postgres:5432/ecommerce}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-http://jaeger:4317}
+    ports:
+      - "8001:8001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - backend
+
+  cart-service:
+    build:
+      context: ../services
+      dockerfile: cart-service/Dockerfile
+    container_name: cart-service
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql://ecommerce:ecommerce_pass@postgres:5432/ecommerce}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - CATALOG_SERVICE_URL=${CATALOG_SERVICE_URL:-http://catalog-service:8001}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-http://jaeger:4317}
+    ports:
+      - "8002:8002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      catalog-service:
+        condition: service_started
+    networks:
+      - backend
+
+  order-service:
+    build:
+      context: ../services
+      dockerfile: order-service/Dockerfile
+    container_name: order-service
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql://ecommerce:ecommerce_pass@postgres:5432/ecommerce}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - RABBITMQ_URL=${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
+      - CART_SERVICE_URL=${CART_SERVICE_URL:-http://cart-service:8002}
+      - PAYMENT_SERVICE_URL=${PAYMENT_SERVICE_URL:-http://payment-service:8004}
+      - INVENTORY_SERVICE_URL=${INVENTORY_SERVICE_URL:-http://inventory-service:8005}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-http://jaeger:4317}
+      - COMMUNICATION_MODE=${COMMUNICATION_MODE:-sync}
+    ports:
+      - "8003:8003"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - backend
+
+  payment-service:
+    build:
+      context: ../services
+      dockerfile: payment-service/Dockerfile
+    container_name: payment-service
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql://ecommerce:ecommerce_pass@postgres:5432/ecommerce}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - RABBITMQ_URL=${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-http://jaeger:4317}
+      - PAYMENT_FAILURE_RATE=${PAYMENT_FAILURE_RATE:-0.1}
+      - PAYMENT_DELAY_MS=${PAYMENT_DELAY_MS:-100}
+    ports:
+      - "8004:8004"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - backend
+
+  inventory-service:
+    build:
+      context: ../services
+      dockerfile: inventory-service/Dockerfile
+    container_name: inventory-service
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql://ecommerce:ecommerce_pass@postgres:5432/ecommerce}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - RABBITMQ_URL=${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-http://jaeger:4317}
+    ports:
+      - "8005:8005"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - backend
+
+  # ===================
+  # UI
+  # ===================
+  ui:
+    build:
+      context: ../ui
+      dockerfile: Dockerfile
+    container_name: ui
+    environment:
+      - API_GATEWAY_URL=${API_GATEWAY_URL:-http://api-gateway:8181}
+    ports:
+      - "8501:8501"
+    depends_on:
+      - api-gateway
+    networks:
+      - frontend
+      - backend
+
+  # ===================
+  # Load Testing
+  # ===================
+  locust:
+    build:
+      context: ../tests/load
+      dockerfile: Dockerfile
+    container_name: locust
+    environment:
+      - TARGET_HOST=http://api-gateway:8181
+    ports:
+      - "8089:8089"
+    depends_on:
+      - api-gateway
+    networks:
+      - frontend
+      - backend
+    profiles:
+      - load-test
+
+volumes:
+  postgres_data:
+  redis_data:
+  rabbitmq_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  frontend:
+    driver: bridge
+  backend:
+    driver: bridge

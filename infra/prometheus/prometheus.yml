@@ -1,0 +1,38 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: "api-gateway"
+    static_configs:
+      - targets: ["api-gateway:8181"]
+    metrics_path: /metrics
+
+  - job_name: "catalog-service"
+    static_configs:
+      - targets: ["catalog-service:8001"]
+    metrics_path: /metrics
+
+  - job_name: "cart-service"
+    static_configs:
+      - targets: ["cart-service:8002"]
+    metrics_path: /metrics
+
+  - job_name: "order-service"
+    static_configs:
+      - targets: ["order-service:8003"]
+    metrics_path: /metrics
+
+  - job_name: "payment-service"
+    static_configs:
+      - targets: ["payment-service:8004"]
+    metrics_path: /metrics
+
+  - job_name: "inventory-service"
+    static_configs:
+      - targets: ["inventory-service:8005"]
+    metrics_path: /metrics
