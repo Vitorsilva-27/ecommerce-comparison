@@ -2,13 +2,18 @@
 
 import streamlit as st
 from uuid import uuid4
+from theme import apply_theme_css, render_theme_toggle, init_theme
 
 st.set_page_config(
     page_title="E-commerce Comparison",
-    page_icon="🛒",
+    page_icon="cart",
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# Initialize theme and apply CSS
+init_theme()
+apply_theme_css()
 
 # Initialize session state
 if "user_id" not in st.session_state:
@@ -80,3 +85,6 @@ try:
 except Exception as e:
     st.sidebar.error(f"API Gateway: Offline")
     st.sidebar.caption(str(e))
+
+# Theme toggle at the bottom of sidebar
+render_theme_toggle()

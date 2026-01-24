@@ -7,10 +7,17 @@ import plotly.graph_objects as go
 import httpx
 import time
 from datetime import datetime
+import sys
+sys.path.insert(0, str(__file__).replace("\\", "/").rsplit("/", 2)[0])
+from theme import apply_theme_css, render_theme_toggle, init_theme, get_plotly_theme, get_plotly_layout_updates
 
-st.set_page_config(page_title="Performance", page_icon="📊", layout="wide")
+st.set_page_config(page_title="Performance", page_icon="bar_chart", layout="wide")
 
-st.title("📊 Performance Comparison")
+# Initialize theme and apply CSS
+init_theme()
+apply_theme_css()
+
+st.title("Performance Comparison")
 
 st.markdown("""
 Compare the performance characteristics of **synchronous** vs **asynchronous**
@@ -238,11 +245,15 @@ with tab2:
             x=latency_df['Percentile'],
             y=latency_df['Async (ms)']
         ))
+
+        # Apply theme to chart
+        layout_updates = get_plotly_layout_updates()
         fig.update_layout(
             title="Latency Comparison by Percentile",
             barmode='group',
             yaxis_title="Latency (ms)",
-            xaxis_title="Percentile"
+            xaxis_title="Percentile",
+            **layout_updates
         )
         st.plotly_chart(fig, use_container_width=True)
 
@@ -308,3 +319,6 @@ st.sidebar.markdown("---")
 if st.sidebar.checkbox("Auto-refresh (10s)"):
     time.sleep(10)
     st.rerun()
+
+# Theme toggle at the bottom of sidebar
+render_theme_toggle()

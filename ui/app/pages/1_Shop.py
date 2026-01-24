@@ -3,8 +3,15 @@
 import streamlit as st
 from uuid import uuid4
 import time
+import sys
+sys.path.insert(0, str(__file__).replace("\\", "/").rsplit("/", 2)[0])
+from theme import apply_theme_css, render_theme_toggle, init_theme
 
-st.set_page_config(page_title="Shop", page_icon="🛍️", layout="wide")
+st.set_page_config(page_title="Shop", page_icon="shopping_bags", layout="wide")
+
+# Initialize theme and apply CSS
+init_theme()
+apply_theme_css()
 
 # Initialize session state
 if "user_id" not in st.session_state:
@@ -16,7 +23,7 @@ if "cart" not in st.session_state:
 if "confirm_delete" not in st.session_state:
     st.session_state.confirm_delete = None
 
-st.title("🛍️ Shop")
+st.title("Shop")
 
 try:
     from utils import (
@@ -273,3 +280,6 @@ except ImportError as e:
 except Exception as e:
     st.error(f"An error occurred: {e}")
     st.exception(e)
+
+# Theme toggle at the bottom of sidebar
+render_theme_toggle()
