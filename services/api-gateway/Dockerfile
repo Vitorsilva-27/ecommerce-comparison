@@ -12,6 +12,9 @@ COPY shared /app/shared
 # Copy application code
 COPY api-gateway/app /app/app
 
+
+
+
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 
